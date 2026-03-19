@@ -1,0 +1,1840 @@
+{
+  "name": "Router Intercom → Azure",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://api.intercom.io/contacts/{{ $json.body.data.item.contacts.contacts[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Intercom-Version",
+              "value": "2.14"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1760,
+        -528
+      ],
+      "id": "4f9d9e56-b3ec-43f6-9975-6caa0f46173c",
+      "name": "HTTP Request (Intercom - ticket)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "v1oa0YcYRfpLkQgf",
+          "name": "Bearer Auth Intercom"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.intercom.io/companies/{{$json.body.data.item.company_id}}\n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Intercom-Version",
+              "value": "2.14"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1760,
+        -320
+      ],
+      "id": "24f0a7f5-eddf-492a-98e8-cb2403fd12dc",
+      "name": "HTTP Request (Intercom - company)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "v1oa0YcYRfpLkQgf",
+          "name": "Bearer Auth Intercom"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1408,
+        -432
+      ],
+      "id": "ce8eab69-99a6-4550-99a6-9b755c65fe5b",
+      "name": "Merge (ticket - company)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "13bba2e4-b2f3-4d2c-9da1-20474ceb257d",
+              "name": "=title",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.ticket_attributes._default_title_ }}",
+              "type": "string"
+            },
+            {
+              "id": "62b2a448-d1d4-411c-bbc2-a9ad3f6cfadd",
+              "name": "description",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.ticket_attributes._default_description_ }}",
+              "type": "string"
+            },
+            {
+              "id": "07537110-100f-4196-be0a-048f17e05e02",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "678459bc-9628-4fa0-8404-90c07b2dcf16",
+              "name": "catalogUrl",
+              "value": "={{ $json.custom_attributes.catalog }}",
+              "type": "string"
+            },
+            {
+              "id": "654de136-8177-4d27-b152-8630951b34eb",
+              "name": "createdAt",
+              "value": "={{ $json.created_at }}",
+              "type": "number"
+            },
+            {
+              "id": "78af39ec-02a8-4330-82dd-eff36ec12c77",
+              "name": "createdBy",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.ticket_parts.ticket_parts[1].author.email }}",
+              "type": "string"
+            },
+            {
+              "id": "738acf95-33b9-4d8f-9b0d-a21ddcda25b9",
+              "name": "ticketId",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "67a33654-b913-4cb6-8017-795f268efe22",
+              "name": "intercomId",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.id }}",
+              "type": "string"
+            },
+            {
+              "id": "237e4a81-467b-4dfd-b60b-528c3479d472",
+              "name": "platform",
+              "value": "={{ $json.platform }}",
+              "type": "string"
+            },
+            {
+              "id": "1d509d59-4e4a-49bd-a244-e5d79ea34c7b",
+              "name": "operationalSystem",
+              "value": "={{ $json.operationalSystem }}",
+              "type": "string"
+            },
+            {
+              "id": "09baf1c7-7a36-4175-9a80-69a9fa693836",
+              "name": "osVersion",
+              "value": "={{ $json.osVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "eb03450c-9b8a-43c7-943c-bd249bb3db5c",
+              "name": "appVersion",
+              "value": "={{ $json.appVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "c3f18e0a-924f-400c-83cf-e948f5a87336",
+              "name": "deviceModel",
+              "value": "={{ $json.deviceModel }}",
+              "type": "string"
+            },
+            {
+              "id": "58929d5c-cdcd-42c1-a6e7-1d8a1744bc30",
+              "name": "browserName",
+              "value": "={{ $json.browserName }}",
+              "type": "string"
+            },
+            {
+              "id": "e4b23803-7078-4bc3-96b3-2fa07ce36ae5",
+              "name": "browser_version",
+              "value": "={{ $json.browser_version }}",
+              "type": "string"
+            },
+            {
+              "id": "ed59dd51-3a93-4b7d-bd2a-4ddf87624d98",
+              "name": "aid",
+              "value": "={{ $json.custom_attributes.aid }}",
+              "type": "string"
+            },
+            {
+              "id": "04703c7a-b5e0-4c09-aef9-57328aaefb76",
+              "name": "catalogUrl",
+              "value": "={{ $json.custom_attributes.catalog }}",
+              "type": "string"
+            },
+            {
+              "id": "bfbf2807-2111-4b17-8fda-b2bdc525246b",
+              "name": "azureTag",
+              "value": "={{ $json.azureTag }}",
+              "type": "string"
+            },
+            {
+              "id": "04a40169-9500-4805-8807-d5383d5e8925",
+              "name": "conversationLink",
+              "value": "={{ $('Webhook Intercom (ticket created)').item.json.body.data.item.ticket_attributes['Conversation link'] }}",
+              "type": "string"
+            },
+            {
+              "id": "f061deab-8cce-4685-94cc-7b11da521f01",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -624,
+        -336
+      ],
+      "id": "5c7433a2-0a5a-48da-8152-8a215bcf2d56",
+      "name": "Payload"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workitems/$Issue?api-version=7.0",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json-patch+json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \nJSON.stringify([\n\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Kyte\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: $json.description },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n{ op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: ['n8n', $json.azureTag].filter(Boolean).join('; ')}\n\n\n]) \n}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -384,
+        -336
+      ],
+      "id": "257637be-46db-4419-9b26-478dc7974989",
+      "name": "HTTP Request (Azure - Create Issue)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "IwqcIcKJZ99PPziA",
+          "name": "Intercom - Token"
+        },
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6da744cd-1921-4d7e-94b9-04df75a7ba8b",
+              "name": "azureId",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "732b8a29-5f79-412f-9510-dca8751ffbca",
+              "name": "azureLink",
+              "value": "={{$json[\"_links\"][\"html\"][\"href\"]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -144,
+        -336
+      ],
+      "id": "838bd8b6-1d4f-4d42-833c-e4d851b2ea68",
+      "name": "Azure id + link"
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $json;\n\n// last seen por canal\nconst iosSeen = Number(c.ios_last_seen_at || 0);\nconst androidSeen = Number(c.android_last_seen_at || 0);\n\n// web: só considera se tiver browser e last_seen_at\nconst webSeen = c.browser ? Number(c.last_seen_at || 0) : 0;\n\nconst maxSeen = Math.max(iosSeen, androidSeen, webSeen);\n\nlet platform = 'unknown';\nlet operationalSystem = null;\nlet osVersion = null;\nlet appVersion = null;\nlet deviceModel = null;\nlet browserName = null;\n\nif (maxSeen === iosSeen && iosSeen > 0) {\n  platform = 'ios';\n  operationalSystem = 'iOS';\n  osVersion = c.ios_os_version || null;\n  appVersion = c.ios_app_version || null;\n  deviceModel = c.ios_device || null;\n\n} else if (maxSeen === androidSeen && androidSeen > 0) {\n  platform = 'android';\n  operationalSystem = 'Android';\n  osVersion = c.android_os_version || null;\n  appVersion = c.android_app_version || null;\n  deviceModel = c.android_device || null;\n\n} else if (maxSeen === webSeen && webSeen > 0) {\n  platform = 'Web';\n  // Web: OS real + browser version\n  operationalSystem = c.os || null;            // ex: Windows 10\n  osVersion = c.browser_version || null;       // ex: 144.0.0\n  browserName = c.browser || null;             // ex: Chrome / Edge\n  appVersion = null;\n  deviceModel = null;\n}\n\nreturn [{\n  json: {\n    ...c,\n    platform,\n    operationalSystem,\n    osVersion,\n    appVersion,\n    deviceModel,\n    browserName,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -432
+      ],
+      "id": "e4cfff50-ede2-49b1-bd42-4e56b9a9d26f",
+      "name": "Normalize Environment"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "router",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2816,
+        944
+      ],
+      "id": "c7924d04-9001-4b90-8e90-2a5d0ee9bfb5",
+      "name": "Webhook Intercom (ticket created)",
+      "webhookId": "4c7192b6-529b-4118-b76b-7505643f800c"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -880,
+        -336
+      ],
+      "id": "1640bfed-e00a-4d9c-a90e-d44037ef4726",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o ticket_type de forma \"à prova de variação\" com validação segura\nconst item = $input.first()?.json?.body?.data?.item ?? {};\nconst type = item?.ticket_type?.name ?? null;\n\nconst tagMap = {\n  \"Assinaturas/Pagamentos\": \"Ongoing payments\",\n  \"Catálogo\": \"Ongoing catálogo\",\n  \"Estatística\": \"Ongoing estatística\",\n  \"Estoque\": \"Ongoing estoque\",\n  \"Fiado\": \"Ongoing fiado\",\n  \"Finanças\": \"Ongoing finanças\",\n  \"Variantes\": \"Ongoing variantes\",\n  \"Problemas gerais\": \"Ongoing geral\"\n};\n\n// Normaliza a entrada removendo espaços extras\nconst normalizedType = type?.trim?.();\n\n// Busca no mapa com fallback explícito\nconst azureTag = normalizedType && tagMap.hasOwnProperty(normalizedType) \n  ? tagMap[normalizedType] \n  : null;\n\nreturn [\n  {\n    json: {\n      azureTag,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        -128
+      ],
+      "id": "f2a07787-57d5-4f4d-999c-fc0a222c460f",
+      "name": "Normalize Tags"
+    },
+    {
+      "parameters": {
+        "content": "ticket.created",
+        "height": 880,
+        "width": 4368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2192,
+        -688
+      ],
+      "typeVersion": 1,
+      "id": "7a3d00f0-e497-4ff4-831f-0eca1935aba5",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0729d5ae-3ae9-479f-868b-b101a865faa7",
+              "name": "intercom_id",
+              "value": "={{ $json.body.data.item.ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6a1273c9-2e75-46f8-bf3c-45f8aa7079f0",
+              "name": "ticket_state",
+              "value": "={{ $json.body.data.item.ticket_state.id }}",
+              "type": "string"
+            },
+            {
+              "id": "9ac221ce-dc07-47c3-814e-4f2eb4e99a7b",
+              "name": "azure_id",
+              "value": "={{ $json.body.data.item.ticket_attributes[\"Azure ID\"] ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "77cfa543-e6b3-4de9-964f-5a7dcd7fca00",
+              "name": "body.data.item.id",
+              "value": "={{ $json.body.data.item.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1952,
+        800
+      ],
+      "id": "3eb20303-a60d-4ef3-ba85-cf58ec770e3b",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const map = {\n  \"4572477\": \"To Do\",\n  \"4572478\": \"Doing\",\n  \"4572479\": \"CS\",\n  \"4572485\": \"Ready\",\n  \"4572490\": \"On Hold\",\n  \"4572484\": \"Done\",\n};\n\nconst newAzureState = map[String($json.ticket_state)];\n\nif (!newAzureState) {\n  throw new Error(\"ticket_state não mapeado: \" + $json.ticket_state);\n}\n\nreturn [{ ...$json, newAzureState }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1472,
+        800
+      ],
+      "id": "59b841fe-ee2e-4398-9fac-4b2f8549e52c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workitems/{{$json.azure_id}}?api-version=7.1\n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json-patch+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"op\": \"add\",\n    \"path\": \"/fields/System.State\",\n    \"value\": \"{{ $json.newAzureState }}\"\n  }\n]\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1248,
+        800
+      ],
+      "id": "68f24677-9e3e-43c7-9065-bb75f5633340",
+      "name": "HTTP Request4",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "v1oa0YcYRfpLkQgf",
+          "name": "Bearer Auth Intercom"
+        },
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "ticket.state.update",
+        "height": 256,
+        "width": 1152,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2112,
+        736
+      ],
+      "typeVersion": 1,
+      "id": "d7f9342d-5d61-4134-a561-53f3996cae24",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.topic }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "ticket.created"
+            },
+            {
+              "value2": "ticket.state.updated"
+            },
+            {
+              "value2": "ticket.note.created"
+            }
+          ]
+        }
+      },
+      "id": "c875b11c-e0bb-4c81-979b-fac9d0ceb5d2",
+      "name": "Switch (body.topic)1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [
+        -2560,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "content": "ticket.note.created",
+        "height": 560,
+        "width": 2288,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2176,
+        1280
+      ],
+      "typeVersion": 1,
+      "id": "2c7cd216-3d62-4f4d-8566-cdb768eeacc1",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0e6aa3d1-608b-4950-b74e-c3865c505e23",
+              "leftValue": "={{ ($node[\"Webhook Intercom (ticket created)\"].json.body?.data?.item?.ticket_attributes?.Anexos ?? []).length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        -336
+      ],
+      "id": "d996d76b-15d1-4d5f-ac5c-e55c60764f59",
+      "name": "Tem anexo?"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.fileUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        848,
+        -352
+      ],
+      "id": "1d8699b0-5606-4e0f-b76c-095bdc2acced",
+      "name": "Download Intercom file"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/attachments?fileName={{$json.fileName}}&api-version=7.1\n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        -352
+      ],
+      "id": "a7247d44-cc90-45b3-bd23-2081c7a47472",
+      "name": "Azure - Upload Attachment",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const anexos = $node[\"Webhook Intercom (ticket created)\"].json.body?.data?.item?.ticket_attributes?.Anexos ?? [];\nconst azureId = items[0].json[\"Azure ID\"];\n\nreturn anexos.map(a => ({ json: { ...items[0].json, azureId, fileName: a.name, fileUrl: a.url, } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -352
+      ],
+      "id": "88de4976-b4a8-42e2-b33a-796cd05a16da",
+      "name": "Prepare Attachments"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workitems/{{$json.azureId}}?api-version=7.1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json-patch+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.ops}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1904,
+        -352
+      ],
+      "id": "072b2f73-2242-4d68-a1c3-7b5d020f2d17",
+      "name": "Azure - Link Attachment",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Melhorias:\n- Anti-loop\n- Barrar o state.update do ticket created\n- Imagem nos comentários\n- vídeo nos anexos\n- anexar mais de um documento\n- Como anexar um segundo vídeo após retorno? \n- ticket.attibute update\n- padronizar escrita\n- assigned no update do card no ticket\n- inserir plano no card\n- só está adicionando um anexo\n\n\n\n",
+        "height": 480,
+        "width": 416,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2992,
+        -640
+      ],
+      "typeVersion": 1,
+      "id": "1196af42-0d36-4587-8782-0947dcc062f9",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7efa682e-1f29-49b4-ba91-3cd48e8a8de8",
+              "leftValue": "={{ $json.azure_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1744,
+        800
+      ],
+      "id": "688d3c4d-93b3-4427-a014-086ff1ee817b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// pega o azureId do primeiro item (todos têm o mesmo)\nconst azureId = items[0].json.azureId || items[0].json.azureid || null;\n\nconst ops = items.map(i => {\n  const url = i.json.url;\n\n  return {\n    op: \"add\",\n    path: \"/relations/-\",\n    value: {\n      rel: \"AttachedFile\",\n      url,\n      attributes: {\n        comment: \"Anexo do Intercom\"\n      }\n    }\n  };\n});\n\nreturn [\n  {\n    json: {\n      azureId,\n      ops\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        -352
+      ],
+      "id": "46c2711d-eb7a-44c9-b153-173120696853",
+      "name": "Build Patch (relations)"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.intercom.io/tickets/{{ $node[\"Webhook Intercom (ticket created)\"].json.body.data.item.id }}\n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ticket_attributes\": {\n    \"Azure ID\": \"{{$json.azureId}}\",\n    \"Azure link\": \"{{$json.azureLink}}\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        80,
+        -336
+      ],
+      "id": "ca443b42-2e32-4417-b17d-dd7395bcdc4f",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "v1oa0YcYRfpLkQgf",
+          "name": "Bearer Auth Intercom"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1f953ae5-3384-46fa-bc9a-0680927e7000",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "371f1dd0-c0f8-4a2a-9dc6-410790323571",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "33a99c43-17fe-4d5c-84d0-f05d05d7479b",
+              "name": "azureId",
+              "value": "={{ $('Azure id + link').item.json.azureId }}",
+              "type": "number"
+            },
+            {
+              "id": "d8f593fa-2893-400e-9a9d-b1516969bed0",
+              "name": "azureLink",
+              "value": "={{ $('Azure id + link').item.json.azureLink }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        -352
+      ],
+      "id": "98244e54-3d66-4a76-a3f9-3eae9d61d5e7",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workItems/{{$json.azureId}}/comments?api-version=7.1-preview.3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$json.comment}}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "11a63eb8-6f36-4124-91cc-477509c4885b",
+      "name": "Create Comment in Azure1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -112,
+        1392
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "=azureId",
+              "value": "={{ (() => { const id = $json.body.data.item.ticket.ticket_attributes?.[\"Azure ID\"]; return id ? Number(String(id).trim()) : null; })() }}"
+            },
+            {
+              "name": "commentHtml",
+              "value": "={{ $json.body.data.item.ticket_part.body }}"
+            },
+            {
+              "name": "commentText",
+              "value": "={{\n(() => {\n  const html = $json.body.data.item.ticket_part.body || \"\";\n\n  // Mantém formatação HTML mas remove containers de imagem\n  // (imagens são tratadas separadamente)\n  const text = html\n    .replace(/<div[^>]*class=\"intercom-container\"[^>]*>.*?<\\/div>/gis, '')\n    .replace(/<img[^>]*>/gi, '')\n    .replace(/<p[^>]*class=\"no-margin\"[^>]*>/gi, '')\n    .replace(/<\\/p>/gi, '<br>')\n    .replace(/(<br>\\s*)+$/gi, '')\n    .trim();\n\n  return text || \"(sem texto)\";\n})()\n}}"
+            },
+            {
+              "name": "ticketId",
+              "value": "={{ $json.body.data.item.ticket.ticket_id }}"
+            },
+            {
+              "name": "authorName",
+              "value": "={{ $json.body.data.item.ticket_part.author.name }}"
+            },
+            {
+              "name": "attachments",
+              "value": "={{ $json.body.data.item.ticket.ticket_attributes[\"Anexos\"] || [] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36213aa5-31bb-4122-b692-6b3ad8fc4759",
+      "name": "Prepare Azure comment1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const azureId = $json.azureId;\nconst text = $json.commentText || \"\";\nconst html = $json.commentHtml || \"\";\n\n// Validação: Azure ID é obrigatório para sincronizar comentários\nif (!azureId || azureId === 0) {\n  throw new Error(\"Azure ID não encontrado no ticket. O ticket precisa ter um Azure ID vinculado para sincronizar comentários.\");\n}\n\n// 1) Pega do campo attachments (vem do ticket_attributes[\"Anexos\"])\nconst attachments = $json.attachments || [];\nlet imageUrls = attachments\n  .filter(a => (a.content_type || \"\").startsWith(\"image/\"))\n  .map(a => (a.url || \"\").replace(/&amp;/g, \"&\"));\n\n// 2) Se não existir attachments, cai pro HTML\nif (!imageUrls.length) {\n  imageUrls = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/g)]\n    .map(m => m[1].replace(/&amp;/g, \"&\"));\n}\n\nreturn [{ json: { azureId, text, imageUrls } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1792,
+        1408
+      ],
+      "id": "6ff31ad9-f5ef-4aa9-aa84-0f74a800ee6c",
+      "name": "Extract image URLs1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "img-check-001",
+              "leftValue": "={{ $json.imageUrls.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1552,
+        1408
+      ],
+      "id": "a1b2c3d4-if-has-images",
+      "name": "Tem imagens?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Comentário simples sem imagens\nconst azureId = $json.azureId;\nconst text = $json.text || \"(sem texto)\";\n\n// Texto já vem em HTML do Intercom\nreturn [{\n  json: {\n    azureId,\n    comment: text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        1568
+      ],
+      "id": "simple-comment-code",
+      "name": "Prepare Simple Comment"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workItems/{{$json.azureId}}/comments?api-version=7.1-preview.3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$json.comment}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1056,
+        1568
+      ],
+      "id": "create-simple-comment",
+      "name": "Create Simple Comment",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$json.imageUrls[0]}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1088,
+        1392
+      ],
+      "id": "71092e2d-3f25-44d4-94fd-9e74237b9d51",
+      "name": "Download image1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dev.azure.com/KyteLand/Ongoing/_apis/wit/attachments?fileName=image.png&api-version=7.1-preview.3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -864,
+        1392
+      ],
+      "id": "669595c5-a59d-4889-b0a6-d1d207a2e107",
+      "name": "Upload Attachment to Azure1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const azureId = $json.azureId;\nconst text = $json.text || \"Atualização com imagem\";\n\n// IMPORTANTE: aqui pegamos a URL que o Azure retornou\nconst attachmentUrl = $json.url;\n\n// Texto já vem em HTML, apenas adiciona a imagem\nconst htmlImage = `<br><br><img src=\"${attachmentUrl}\" alt=\"imagem\" />`;\n\nreturn [{\n  json: {\n    azureId,\n    comment: text + htmlImage\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        1392
+      ],
+      "id": "ee7290e5-b9e4-4163-ad5f-298895be4f63",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = ($json.imageUrls?.[0] || \"\")\n  .replace(/&amp;/g, \"&\")   // corrige HTML entity\n  .trim();\n\nreturn [{\n  json: {\n    ...$json,\n    imageUrl: url\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        1392
+      ],
+      "id": "014cec47-c9fe-4f75-bb79-a9a87c0414fb",
+      "name": "Fix image URL1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d754f8f7-0eb0-4558-bb31-d72d5d2d0bd6",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "2613cbca-20b0-4419-a454-a94b0ab03b00",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "26b939b0-8330-4172-9745-5bdbcc57ca1f",
+              "name": "azureId",
+              "value": "={{ $('Extract image URLs1').item.json.azureId }}",
+              "type": "number"
+            },
+            {
+              "id": "text-field-001",
+              "name": "text",
+              "value": "={{ $('Extract image URLs1').item.json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -608,
+        1392
+      ],
+      "id": "f7b4a6c0-6cc4-4ee1-9ec4-71f05ee25de4",
+      "name": "Edit Fields5"
+    }
+  ],
+  "pinData": {
+    "Webhook Intercom (ticket created)": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.kyteapp.com",
+            "x-request-id": "2045ab5e5b763c31e7fa0b0e6bcf66f2",
+            "x-real-ip": "172.68.245.151",
+            "x-forwarded-for": "172.68.245.151",
+            "x-forwarded-host": "n8n.kyteapp.com",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-scheme": "https",
+            "x-scheme": "https",
+            "x-original-forwarded-for": "34.197.76.213",
+            "content-length": "6145",
+            "cf-ray": "9d6b670d3b8ac9b3-IAD",
+            "accept": "application/json",
+            "cdn-loop": "cloudflare; loops=1",
+            "accept-encoding": "gzip, br",
+            "x-datadog-parent-id": "819442146301268113",
+            "x-datadog-trace-id": "3145825392632643459",
+            "cf-ipcountry": "US",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-connecting-ip": "34.197.76.213",
+            "intercom-version": "2.14",
+            "date": "Tue, 03 Mar 2026 20:31:03 GMT",
+            "x-hub-signature": "sha1=34699288b156a498a9b839ee8e0ed20c888e4d2e",
+            "intercom-webhook-subscription-id": "nsub_wd_904a82e8-7cda-41bc-b9ab-95c78b780d83_xiivsyz8",
+            "x-datadog-sampling-priority": "1",
+            "user-agent": "Intercom/Parrot 1.3",
+            "content-type": "application/json"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "type": "notification_event",
+            "app_id": "xiivsyz8",
+            "data": {
+              "type": "notification_event_data",
+              "item": {
+                "type": "ticket",
+                "id": "215473334766455",
+                "ticket_id": "80432668",
+                "ticket_attributes": {
+                  "_default_title_": "GROW > Pedidos não são notificados",
+                  "_default_description_": "User está na versão clássica do catálogo e não recebe notificações dos pedidos (video anexado). Mencionou que já testamos com a nova versão do catálogo e o mesmo ocorre. Fiz um teste no meu iOS, com o app recém instalado e também não as recebi (video anexado). Poderiam verificar, please?",
+                  "Anexos": [
+                    {
+                      "type": "upload",
+                      "name": "ScreenRecording_03-03-2026 10-18-56_1.mp4",
+                      "url": "https://kyte-41c62cba82cc.intercom-attachments-1.com/i/o/xiivsyz8/2124684181/aa3245e431ab6ef7a90e394d108e/ScreenRecording_03-03-2026+10-18-56_1.mp4?expires=1772571600&signature=56faab1a418991038a20a0b6cc53e7db4f1f1cf4bb9154796afdc3ef73107a38&req=diElEs92mYBXWPMW1HO4zW6sPDV%2FOzpFdZA67YOAslrqRt1C9We%2Bwf0%3D%0A",
+                      "content_type": "video/mp4",
+                      "filesize": 80517971,
+                      "width": null,
+                      "height": null
+                    },
+                    {
+                      "type": "upload",
+                      "name": "ScreenRecording_03-03-2026 17-23-20_1.MP4",
+                      "url": "https://kyte-41c62cba82cc.intercom-attachments-1.com/i/o/xiivsyz8/2124684352/def3bce1c2e5a1262f87ae762d7c/ScreenRecording_03-03-2026+17-23-20_1.MP4?expires=1772571600&signature=a5d72566079400b908c07bd4ed0ae610b3984a7ef24283ccd5f66ba6a427a777&req=diElEs92mYJaW%2FMW1HO4zThsnv%2BZuPpAflY%2F36oGtMJ4EfRioItfAr4%3D%0A",
+                      "content_type": "video/mp4",
+                      "filesize": 4834219,
+                      "width": null,
+                      "height": null
+                    }
+                  ],
+                  "Conversation link": "https://app.intercom.com/a/inbox/xiivsyz8/inbox/admin/6511147/conversation/215473325763991?view=List",
+                  "Azure ID": null,
+                  "Azure link": null
+                },
+                "ticket_state": {
+                  "type": "ticket_state",
+                  "id": "4572477",
+                  "category": "submitted",
+                  "internal_label": "To-do",
+                  "external_label": "To-do"
+                },
+                "ticket_type": {
+                  "type": "ticket_type",
+                  "id": "2998049",
+                  "name": "Problemas gerais",
+                  "description": "",
+                  "icon": "❓",
+                  "workspace_id": "xiivsyz8",
+                  "archived": false,
+                  "created_at": 1770073356,
+                  "updated_at": 1770075406,
+                  "is_internal": true,
+                  "ticket_type_attributes": {
+                    "type": "list",
+                    "data": [
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8587064",
+                        "workspace_id": "xiivsyz8",
+                        "name": "_default_title_",
+                        "description": "",
+                        "data_type": "string",
+                        "input_options": {
+                          "multiline": false
+                        },
+                        "order": 0,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": true,
+                        "visible_to_contacts": false,
+                        "default": true,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1770073356,
+                        "updated_at": 1770073356
+                      },
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8587065",
+                        "workspace_id": "xiivsyz8",
+                        "name": "_default_description_",
+                        "description": "",
+                        "data_type": "string",
+                        "input_options": {
+                          "multiline": true
+                        },
+                        "order": 1,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": true,
+                        "visible_to_contacts": false,
+                        "default": true,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1770073356,
+                        "updated_at": 1770073356
+                      },
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8625249",
+                        "workspace_id": "xiivsyz8",
+                        "name": "Anexos",
+                        "description": null,
+                        "data_type": "files",
+                        "input_options": null,
+                        "order": 2,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": true,
+                        "visible_to_contacts": false,
+                        "default": false,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1771515887,
+                        "updated_at": 1771515894
+                      },
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8625247",
+                        "workspace_id": "xiivsyz8",
+                        "name": "Conversation link",
+                        "description": null,
+                        "data_type": "string",
+                        "input_options": {
+                          "multiline": false
+                        },
+                        "order": 3,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": true,
+                        "visible_to_contacts": false,
+                        "default": false,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1771515861,
+                        "updated_at": 1771515861
+                      },
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8587066",
+                        "workspace_id": "xiivsyz8",
+                        "name": "Azure ID",
+                        "description": "",
+                        "data_type": "string",
+                        "input_options": {
+                          "multiline": false
+                        },
+                        "order": 4,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": false,
+                        "visible_to_contacts": false,
+                        "default": false,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1770073356,
+                        "updated_at": 1770077220
+                      },
+                      {
+                        "type": "ticket_type_attribute",
+                        "id": "8587067",
+                        "workspace_id": "xiivsyz8",
+                        "name": "Azure link",
+                        "description": null,
+                        "data_type": "string",
+                        "input_options": {
+                          "multiline": false
+                        },
+                        "order": 5,
+                        "required_to_create": false,
+                        "required_to_create_for_contacts": false,
+                        "visible_on_create": false,
+                        "visible_to_contacts": false,
+                        "default": false,
+                        "ticket_type_id": 2998049,
+                        "archived": false,
+                        "created_at": 1770073356,
+                        "updated_at": 1770073356
+                      }
+                    ]
+                  },
+                  "category": "Back-office"
+                },
+                "contacts": {
+                  "type": "contact.list",
+                  "contacts": [
+                    {
+                      "type": "contact",
+                      "id": "64bed695650bfbad54ba687b",
+                      "external_id": "cC1ZYeK0qjOQKpY1dUL7NtRe6iy2"
+                    }
+                  ]
+                },
+                "admin_assignee_id": "0",
+                "team_assignee_id": "0",
+                "created_at": 1772569861,
+                "updated_at": 1772569862,
+                "ticket_parts": {
+                  "type": "ticket_part.list",
+                  "ticket_parts": [
+                    {
+                      "type": "ticket_part",
+                      "id": "40627121551",
+                      "part_type": "company_updated",
+                      "created_at": 1772569861,
+                      "updated_at": 1772569861,
+                      "author": {
+                        "id": "6483222",
+                        "type": "bot",
+                        "name": "Kyte",
+                        "email": "operator+xiivsyz8@intercom.io"
+                      },
+                      "attachments": [],
+                      "redacted": false
+                    },
+                    {
+                      "type": "ticket_part",
+                      "id": "40627122334",
+                      "part_type": "entity_linked",
+                      "created_at": 1772569862,
+                      "updated_at": 1772569862,
+                      "author": {
+                        "id": "6511147",
+                        "type": "admin",
+                        "name": "Deborah",
+                        "email": "deborah+intercom@kyte.com.br"
+                      },
+                      "attachments": [],
+                      "redacted": false
+                    },
+                    {
+                      "type": "ticket_part",
+                      "id": "40627122589",
+                      "part_type": "ticket_state_updated_by_admin",
+                      "ticket_state": "submitted",
+                      "previous_ticket_state": "submitted",
+                      "created_at": 1772569862,
+                      "updated_at": 1772569862,
+                      "author": {
+                        "id": "6511147",
+                        "type": "admin",
+                        "name": "Deborah",
+                        "email": "deborah+intercom@kyte.com.br"
+                      },
+                      "attachments": [],
+                      "redacted": false
+                    }
+                  ],
+                  "total_count": 3
+                },
+                "open": true,
+                "snoozed_until": null,
+                "linked_objects": {
+                  "type": "list",
+                  "data": [
+                    {
+                      "id": "215473325763991",
+                      "type": "conversation",
+                      "category": null
+                    }
+                  ],
+                  "total_count": 1,
+                  "has_more": false
+                },
+                "category": "Back-office",
+                "is_shared": false,
+                "company_id": "645cdaa3b84b876d0a005e68",
+                "channel": "messenger"
+              }
+            },
+            "links": {},
+            "id": "notif_d2a6583c-780f-42c1-8a2c-461156cc978d",
+            "topic": "ticket.created",
+            "delivery_status": "pending",
+            "delivery_attempts": 1,
+            "delivered_at": 0,
+            "first_sent_at": 1772569863,
+            "created_at": 1772569862,
+            "self": null
+          },
+          "webhookUrl": "https://n8n.kyteapp.com/webhook/router",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "HTTP Request (Intercom - ticket)": {
+      "main": [
+        [
+          {
+            "node": "Merge (ticket - company)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (Intercom - company)": {
+      "main": [
+        [
+          {
+            "node": "Merge (ticket - company)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge (ticket - company)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Environment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Azure - Create Issue)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (Azure - Create Issue)": {
+      "main": [
+        [
+          {
+            "node": "Azure id + link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure id + link": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Environment": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Intercom (ticket created)": {
+      "main": [
+        [
+          {
+            "node": "Switch (body.topic)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Tags": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (body.topic)1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (Intercom - ticket)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request (Intercom - company)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize Tags",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Azure comment1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem anexo?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Download Intercom file": {
+      "main": [
+        [
+          {
+            "node": "Azure - Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Attachments": {
+      "main": [
+        [
+          {
+            "node": "Download Intercom file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure - Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure - Link Attachment": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Patch (relations)": {
+      "main": [
+        [
+          {
+            "node": "Azure - Link Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Tem anexo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Build Patch (relations)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Azure comment1": {
+      "main": [
+        [
+          {
+            "node": "Extract image URLs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract image URLs1": {
+      "main": [
+        [
+          {
+            "node": "Tem imagens?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem imagens?": {
+      "main": [
+        [
+          {
+            "node": "Fix image URL1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Simple Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Simple Comment": {
+      "main": [
+        [
+          {
+            "node": "Create Simple Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download image1": {
+      "main": [
+        [
+          {
+            "node": "Upload Attachment to Azure1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Attachment to Azure1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Create Comment in Azure1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix image URL1": {
+      "main": [
+        [
+          {
+            "node": "Download image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4dfb9e66-e282-4c81-9bd3-ad831f927e71",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a939d2815e33b71a5a57e2ea120e9e2d8f356808dfea97db3d448fabea1ff742"
+  },
+  "id": "7KVwkk3VZ4W-omX0e9egP",
+  "tags": [
+    {
+      "updatedAt": "2026-01-22T15:50:51.944Z",
+      "createdAt": "2026-01-22T15:50:51.944Z",
+      "id": "fuB7k7ZaNTzbjSD4",
+      "name": "ongoing"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# Environment variables (contém credenciais sensíveis)
+.env
+
+# Node modules
+node_modules/
+
+# Workflows gerados (podem conter dados sensíveis)
+workflows/*.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

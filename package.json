@@ -1,0 +1,27 @@
+{
+  "name": "n8n-workflow-generator",
+  "version": "1.0.0",
+  "description": "Sistema orquestrador para gerar workflows n8n a partir de linguagem natural",
+  "main": "src/orchestrator/index.js",
+  "scripts": {
+    "start": "node src/cli.js",
+    "generate": "node src/cli.js",
+    "deploy": "node src/cli.js deploy",
+    "validate": "node src/validators/convention.js",
+    "test": "node examples/test.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "n8n": "^1.97.1",
+    "uuid": "^9.0.1"
+  },
+  "keywords": [
+    "n8n",
+    "workflow",
+    "automation",
+    "generator"
+  ],
+  "author": "",
+  "license": "MIT"
+}
