@@ -65,6 +65,28 @@ Os seguintes Custom Fields são obrigatórios e não podem ser removidos:
 - Custom.Appversion
 - Custom.Priorizar
 
+#### Tratamento de Título
+
+O Intercom pode enviar tickets sem título (`_default_title_: null`). Para evitar erro no Azure (que exige título), o workflow usa fallback:
+
+```javascript
+// Se título for null, gera automaticamente
+_default_title_ || 'Ticket Intercom #' + ticket_id
+```
+
+#### Formatação da Descrição
+
+O Azure DevOps requer HTML para renderizar quebras de linha. O workflow converte automaticamente:
+
+```javascript
+// Converte \n para <br>
+($json.description || '').replace(/\n/g, '<br>')
+```
+
+**Antes**: `Linha 1\nLinha 2` (não renderiza quebra)
+**Depois**: `Linha 1<br>Linha 2` (renderiza corretamente)
+
+---
 
 ### 3️⃣ Intercom → Azure | Sync State
 
