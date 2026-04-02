@@ -34,10 +34,15 @@ Eventos tratados:
 - `ticket.state.updated`
 - `ticket.note.created`
 - `ticket.attribute.updated`
+- `ticket.closed`
 
 Padrão:
 
-Webhook → Set(baseWebhookUrl + topic) → Switch → Forward HTTP
+Webhook → Set Execution Tag (customData) → Switch → Forward HTTP
+
+#### Set Execution Tag
+
+Cada execução é taggeada com o `topic` e `ticket_id` via `$execution.customData.set()`. Também filtra auto-triggers: quando `ticket.attribute.updated` é disparado pelo próprio workflow (atualização de `Azure ID` ou `Azure link`), retorna `[]` para evitar execução desnecessária.
 
 ---
 
@@ -50,10 +55,26 @@ Responsável por:
 - Buscar dados da empresa
 - Normalizar ambiente (iOS / Android / Web)
 - Normalizar tags
-- Criar Issue no Azure
+- Verificar tipo do ticket (Financeiro ou outros)
+- Criar Issue no Azure na area path correta
 - Atualizar ticket no Intercom com:
   - Azure ID
   - Azure Link
+
+#### Roteamento por Tipo de Ticket
+
+Após o Payload, um IF node (`Financeiro?`) verifica `ticket_type.name`:
+
+```
+Payload
+   ↓
+Financeiro?
+   ├── true  → HTTP Request (Azure - Create Issue Financeiro)
+   │            Area Path: Ongoing\Financeiro
+   │            Assigned To: karissa@kyte.com.br
+   └── false → HTTP Request (Azure - Create Issue Kyte)
+                Area Path: Ongoing\Kyte
+```
 
 #### Campos obrigatórios no Azure
 
@@ -166,7 +187,75 @@ As URLs do Intercom (`downloads.intercomcdn.com`) são temporárias (têm `expir
 
 ---
 
-### 5️⃣ Azure → Intercom | Sync State
+### 5️⃣ Intercom → Azure | Sync Attachments (ticket.attribute.updated)
+
+**Parte do workflow**: `Router Intercom → Azure` (ID: `7KVwkk3VZ4W-omX0e9egP`)
+
+Responsável por:
+
+- Receber `ticket.attribute.updated` do Intercom
+- Verificar se o atributo atualizado é `Anexos`
+- Comparar `previous` vs `current` para identificar apenas os **novos** anexos
+- Fazer download e re-upload dos novos anexos para o Azure
+- Vincular os anexos ao Work Item via JSON Patch (relations)
+
+#### Estrutura de Nodes
+
+```
+Switch (output 3: ticket.attribute.updated)
+    ↓
+Extract New Attachments  ← compara previous vs current, filtra novos
+    ↓
+Download Attachment (attr) → Azure - Upload Attachment (attr)
+    ↓
+Edit Fields (attr upload) → Build Patch (attr) → Azure - Link Attachment (attr)
+```
+
+#### Lógica de Detecção de Novos Anexos
+
+```javascript
+// Compara nomes dos anexos atuais vs anteriores
+const currentNames = ticketPart.updated_attribute_data?.value?.label || [];
+const previousNames = ticketPart.updated_attribute_data?.value?.previous || [];
+const newNames = currentNames.filter(name => !previousNames.includes(name));
+```
+
+#### Filtros
+
+- Ignora quando o atributo atualizado **não é** `Anexos` (ex: `Azure ID`, `Azure link`)
+- O `Set Execution Tag` também filtra auto-triggers de `Azure ID` e `Azure link` antes do Switch
+
+---
+
+### 6️⃣ Intercom → Azure | Ticket Closed (ticket.closed)
+
+**Parte do workflow**: `Router Intercom → Azure` (ID: `7KVwkk3VZ4W-omX0e9egP`)
+
+Responsável por:
+
+- Receber `ticket.closed` do Intercom
+- Extrair Azure ID do ticket
+- Atualizar o Work Item no Azure para estado `Done`
+
+#### Estrutura de Nodes
+
+```
+Switch (output 4: ticket.closed)
+    ↓
+Extract Azure ID (closed)  ← valida que Azure ID existe
+    ↓
+HTTP Request (Azure - Set Done)  ← PATCH System.State = "Done"
+```
+
+#### Anti-Loop com Azure → Intercom
+
+Quando o Azure muda para "Done", o workflow **Azure → Intercom | Sync State** recebe o webhook mas **ignora** o estado "Done" (retorna `[]`), evitando propagação de volta ao Intercom.
+
+---
+
+### 7️⃣ Azure → Intercom | Sync State
+
+**Workflow ID**: `4r_vSdJ3l55sEXiPSK5Q-`
 
 Responsável por:
 
@@ -174,6 +263,7 @@ Responsável por:
 - Buscar IntercomID via Custom Field
 - Mapear estado Azure → ticket_state_id Intercom
 - Atualizar ticket via PUT
+- **Ignorar estado "Done"** (evita loop com `ticket.closed`)
 
 #### Mapeamento atual (Azure → Intercom)
 
@@ -192,7 +282,7 @@ Responsável por:
 
 ---
 
-### 6️⃣ Azure → Intercom | Comments
+### 8️⃣ Azure → Intercom | Comments
 
 **Workflow ID**: `ZOvAU7bOgiRleHfgRax0Z`
 
