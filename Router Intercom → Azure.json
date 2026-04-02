@@ -326,6 +326,19 @@
     },
     {
       "parameters": {
+        "jsCode": "const topic = $json.body?.topic || 'unknown';\n$execution.customData.set('topic', topic);\nreturn [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2688,
+        944
+      ],
+      "id": "set-execution-tag",
+      "name": "Set Execution Tag"
+    },
+    {
+      "parameters": {
         "mode": "combine",
         "combineBy": "combineAll",
         "options": {}
@@ -490,6 +503,9 @@
             },
             {
               "value2": "ticket.note.created"
+            },
+            {
+              "value2": "ticket.attribute.updated"
             }
           ]
         }
@@ -882,7 +898,7 @@
             },
             {
               "name": "attachments",
-              "value": "={{ $json.body.data.item.ticket.ticket_attributes[\"Anexos\"] || [] }}"
+              "value": "={{ $json.body.data.item.ticket_part.attachments || [] }}"
             }
           ]
         },
@@ -899,7 +915,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const azureId = $json.azureId;\nconst text = $json.commentText || \"\";\nconst html = $json.commentHtml || \"\";\n\n// Validação: Azure ID é obrigatório para sincronizar comentários\nif (!azureId || azureId === 0) {\n  throw new Error(\"Azure ID não encontrado no ticket. O ticket precisa ter um Azure ID vinculado para sincronizar comentários.\");\n}\n\n// 1) Pega do campo attachments (vem do ticket_attributes[\"Anexos\"])\nconst attachments = $json.attachments || [];\nlet imageUrls = attachments\n  .filter(a => (a.content_type || \"\").startsWith(\"image/\"))\n  .map(a => (a.url || \"\").replace(/&amp;/g, \"&\"));\n\n// 2) Se não existir attachments, cai pro HTML\nif (!imageUrls.length) {\n  imageUrls = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/g)]\n    .map(m => m[1].replace(/&amp;/g, \"&\"));\n}\n\nreturn [{ json: { azureId, text, imageUrls } }];"
+        "jsCode": "const azureId = $json.azureId;\nconst text = $json.commentText || \"\";\nconst html = $json.commentHtml || \"\";\nconst authorName = $json.authorName || \"Intercom\";\n\n// Anti-loop: ignora comentários que vieram do Azure\nif (html.includes('<b>[') && html.includes(']</b>')) {\n  return [];\n}\n\n// Validação: Azure ID é obrigatório para sincronizar comentários\nif (!azureId || azureId === 0) {\n  throw new Error(\"Azure ID não encontrado no ticket. O ticket precisa ter um Azure ID vinculado para sincronizar comentários.\");\n}\n\n// 1) Prioriza imagens do HTML do ticket_part (comentário específico)\nlet imageUrls = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/g)]\n  .map(m => m[1].replace(/&amp;/g, \"&\"));\n\n// 2) Fallback: anexos do ticket_part\nif (!imageUrls.length) {\n  const attachments = $json.attachments || [];\n  imageUrls = attachments\n    .filter(a => (a.content_type || \"\").startsWith(\"image/\"))\n    .map(a => (a.url || \"\").replace(/&amp;/g, \"&\"));\n}\n\nreturn [{ json: { azureId, text, imageUrls, authorName } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -946,7 +962,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Comentário simples sem imagens\nconst azureId = $json.azureId;\nconst text = $json.text || \"(sem texto)\";\n\n// Texto já vem em HTML do Intercom\nreturn [{\n  json: {\n    azureId,\n    comment: text\n  }\n}];"
+        "jsCode": "// Comentário simples sem imagens\nconst azureId = $json.azureId;\nconst text = $json.text || \"(sem texto)\";\nconst authorName = $json.authorName || 'Intercom';\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '[Intercom] <b>[' + authorName + ']</b><br>' + text\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1000,7 +1016,7 @@
     },
     {
       "parameters": {
-        "url": "={{$json.imageUrls[0]}}",
+        "url": "={{$json.imageUrl}}",
         "options": {
           "response": {
             "response": {
@@ -1056,7 +1072,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const azureId = $json.azureId;\nconst text = $json.text || \"Atualização com imagem\";\n\n// IMPORTANTE: aqui pegamos a URL que o Azure retornou\nconst attachmentUrl = $json.url;\n\n// Texto já vem em HTML, apenas adiciona a imagem\nconst htmlImage = `<br><br><img src=\"${attachmentUrl}\" alt=\"imagem\" />`;\n\nreturn [{\n  json: {\n    azureId,\n    comment: text + htmlImage\n  }\n}];"
+        "jsCode": "const azureId = items[0].json.azureId;\nconst text = items[0].json.text || \"Atualização com imagem\";\nconst authorName = items[0].json.authorName || 'Intercom';\n\n// Agrega todas as imagens uploadadas ao Azure\nconst imageHtml = items.map(item => {\n  const attachmentUrl = item.json.url;\n  return '<br><br><img src=\"' + attachmentUrl + '\" alt=\"imagem\" />';\n}).join('');\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '[Intercom] <b>[' + authorName + ']</b><br>' + text + imageHtml\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1069,7 +1085,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const url = ($json.imageUrls?.[0] || \"\")\n  .replace(/&amp;/g, \"&\")   // corrige HTML entity\n  .trim();\n\nreturn [{\n  json: {\n    ...$json,\n    imageUrl: url\n  }\n}];"
+        "jsCode": "const urls = $json.imageUrls || [];\nconst azureId = $json.azureId;\nconst text = $json.text;\nconst authorName = $json.authorName || 'Intercom';\n\nreturn urls.map(url => ({\n  json: {\n    azureId,\n    text,\n    authorName,\n    imageUrl: url.replace(/&amp;/g, '&').trim()\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1107,6 +1123,12 @@
               "name": "text",
               "value": "={{ $('Extract image URLs1').item.json.text }}",
               "type": "string"
+            },
+            {
+              "id": "author-field-001",
+              "name": "authorName",
+              "value": "={{ $('Extract image URLs1').item.json.authorName }}",
+              "type": "string"
             }
           ]
         },
@@ -1120,6 +1142,157 @@
       ],
       "id": "f7b4a6c0-6cc4-4ee1-9ec4-71f05ee25de4",
       "name": "Edit Fields5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $json.body.data.item.ticket;\nconst ticketPart = $json.body.data.item.ticket_part;\nconst azureId = ticket.ticket_attributes?.['Azure ID'];\n\n// Só processa se for atualização de Anexos\nconst updatedAttr = ticketPart?.updated_attribute_data?.attribute?.label;\nif (updatedAttr !== 'Anexos') {\n  return [];\n}\n\n// Valida Azure ID\nif (!azureId) {\n  throw new Error('Azure ID não encontrado no ticket. Não é possível sincronizar anexos.');\n}\n\n// Descobre quais anexos são novos comparando previous vs current\nconst currentNames = ticketPart.updated_attribute_data?.value?.label || [];\nconst previousNames = ticketPart.updated_attribute_data?.value?.previous || [];\nconst newNames = currentNames.filter(name => !previousNames.includes(name));\n\nif (newNames.length === 0) {\n  return [];\n}\n\n// Busca URLs dos novos anexos no campo Anexos do ticket\nconst allAnexos = ticket.ticket_attributes?.Anexos || [];\nconst newAnexos = allAnexos.filter(a => newNames.includes(a.name));\n\nreturn newAnexos.map(a => ({\n  json: {\n    azureId: Number(String(azureId).trim()),\n    fileName: a.name,\n    fileUrl: a.url,\n    contentType: a.content_type\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        1808
+      ],
+      "id": "attr-update-extract",
+      "name": "Extract New Attachments"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.fileUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1552,
+        1808
+      ],
+      "id": "attr-update-download",
+      "name": "Download Attachment (attr)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/attachments?fileName={{$json.fileName}}&api-version=7.1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1296,
+        1808
+      ],
+      "id": "attr-update-upload",
+      "name": "Azure - Upload Attachment (attr)",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "attr-url",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "attr-azureId",
+              "name": "azureId",
+              "value": "={{ $('Extract New Attachments').item.json.azureId }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1040,
+        1808
+      ],
+      "id": "attr-update-editfields",
+      "name": "Edit Fields (attr upload)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const azureId = items[0].json.azureId;\n\nconst ops = items.map(i => ({\n  op: 'add',\n  path: '/relations/-',\n  value: {\n    rel: 'AttachedFile',\n    url: i.json.url,\n    attributes: {\n      comment: 'Anexo do Intercom (attribute update)'\n    }\n  }\n}));\n\nreturn [{ json: { azureId, ops } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        1808
+      ],
+      "id": "attr-update-buildpatch",
+      "name": "Build Patch (attr)"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workitems/{{$json.azureId}}?api-version=7.1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json-patch+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.ops}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -528,
+        1808
+      ],
+      "id": "attr-update-link",
+      "name": "Azure - Link Attachment (attr)",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
     }
   ],
   "pinData": {
@@ -1530,6 +1703,17 @@
       "main": [
         [
           {
+            "node": "Set Execution Tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Execution Tag": {
+      "main": [
+        [
+          {
             "node": "Switch (body.topic)1",
             "type": "main",
             "index": 0
@@ -1610,6 +1794,68 @@
         [
           {
             "node": "Prepare Azure comment1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract New Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract New Attachments": {
+      "main": [
+        [
+          {
+            "node": "Download Attachment (attr)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Attachment (attr)": {
+      "main": [
+        [
+          {
+            "node": "Azure - Upload Attachment (attr)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure - Upload Attachment (attr)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields (attr upload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields (attr upload)": {
+      "main": [
+        [
+          {
+            "node": "Build Patch (attr)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Patch (attr)": {
+      "main": [
+        [
+          {
+            "node": "Azure - Link Attachment (attr)",
             "type": "main",
             "index": 0
           }

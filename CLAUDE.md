@@ -33,6 +33,7 @@ Eventos tratados:
 - `ticket.created`
 - `ticket.state.updated`
 - `ticket.note.created`
+- `ticket.attribute.updated`
 
 Padrão:
 
@@ -98,27 +99,70 @@ Responsável por:
 
 Mapeamento atual:
 
-js
+```javascript
 {
   "4572477": "To Do",
   "4572478": "Doing",
   "4572479": "CS",
   "4572485": "Ready",
   "4572490": "On Hold",
-  "4572484": "Done"
+  "4572484": "Done",
+  "4645359": "Redoing",
+  "4645360": "CS Return"
 }
-
+```
 
 ### 4️⃣ Intercom → Azure | Sync Comments
 
+**Parte do workflow**: `Router Intercom → Azure` (ID: `7KVwkk3VZ4W-omX0e9egP`)
+
 Responsável por:
 
-- Receber comentário criado no Intercom
-- Extrair Azure ID
-- Criar comentário no Work Item Azure
+- Receber `ticket.note.created` do Intercom
+- Verificar anti-loop (ignorar comentários vindos do Azure)
+- Extrair Azure ID do ticket
+- Extrair nome do autor (`ticket_part.author.name`)
+- Verificar se há imagens no comentário
+- Fazer download e re-upload de imagens para o Azure (suporta múltiplas imagens)
+- Enviar comentário para o Azure DevOps com prefixo `[Intercom]` e nome do CSer
 
-#### Endpoint utilizado
+#### Estrutura de Nodes
 
+```
+Prepare Azure comment1
+    ↓
+Extract image URLs1 (anti-loop + extração)
+    ↓
+Tem imagens?
+    ├── Sim → Fix image URL1 → Download image1 → Upload Attachment to Azure1
+    │         → Edit Fields5 → Code in JavaScript2 → Create Comment in Azure1
+    └── Não → Prepare Simple Comment → Create Simple Comment
+```
+
+#### Extração de Imagens
+
+Prioridade de extração (corrigido para evitar pegar imagens erradas):
+
+1. **HTML do `ticket_part.body`** (comentário específico) - extrai `<img>` tags
+2. **Fallback**: `ticket_part.attachments` (anexos do comentário específico)
+
+**Importante**: Não usa mais `ticket.ticket_attributes["Anexos"]` pois esse campo acumula todos os anexos do ticket inteiro.
+
+#### Suporte a Múltiplas Imagens
+
+O `Fix image URL1` retorna N items (um por imagem), que são processados individualmente pelo pipeline de download/upload. O `Code in JavaScript2` agrega todas as imagens de volta em um único comentário.
+
+#### Formato do Comentário no Azure
+
+```
+[Intercom] <b>[Nome do CSer]</b>
+Texto do comentário
+<img src="url_azure_1" /> <img src="url_azure_2" />
+```
+
+#### Re-upload de Imagens
+
+As URLs do Intercom (`downloads.intercomcdn.com`) são temporárias (têm `expires` e `signature`). O workflow faz download e re-upload para o Azure (`/_apis/wit/attachments`) para que as imagens fiquem permanentemente acessíveis.
 
 ---
 
@@ -133,15 +177,18 @@ Responsável por:
 
 #### Mapeamento atual (Azure → Intercom)
 
-js
+```javascript
 {
   "To Do": "4572477",
   "Doing": "4572478",
   "CS": "4572479",
   "Done": "4572484",
   "Ready": "4572485",
-  "On Hold": "4572490"
+  "On Hold": "4572490",
+  "Redoing": "4645359",
+  "CS Return": "4645360"
 }
+```
 
 ---
 
@@ -202,9 +249,9 @@ As notas são criadas usando o admin **Kyter**:
 - **admin_id**: `6511614`
 - **email**: dev@kyte.com.br
 
-#### Anti-Loop
+#### Anti-Loop (implementado)
 
-O workflow verifica se o comentário contém o prefixo `[Intercom]` para evitar reprocessar comentários que vieram do Intercom:
+O node `Check Images` verifica se o comentário contém o prefixo `[Intercom]` para evitar reprocessar comentários que vieram do Intercom:
 
 ```javascript
 // No Check Images node
@@ -215,57 +262,25 @@ if (commentText.includes("[Intercom]")) {
 
 ---
 
-### 7️⃣ Router Intercom → Azure (Comentários)
-
-**Workflow ID**: `7KVwkk3VZ4W-omX0e9egP`
-
-Responsável por:
-
-- Receber `ticket.note.created` do Intercom
-- Extrair Azure ID do ticket
-- Verificar se há imagens no comentário
-- Enviar comentário para o Azure DevOps
-
-#### Anti-Loop
-
-O workflow verifica se o comentário veio do Azure (formato `<b>[Autor]</b>`) para evitar loop infinito:
-
-```javascript
-// No Extract image URLs1 e Prepare Simple Comment
-if (html.includes("<b>[") && html.includes("]</b>")) {
-    return []; // Ignora comentário que veio do Azure
-}
-```
-
-#### Prefixo de Origem
-
-Comentários enviados do Intercom para o Azure recebem o prefixo `[Intercom]`:
-
-```javascript
-const commentWithPrefix = "[Intercom] " + text;
-```
-
----
-
 # 🔄 Mecanismo Anti-Loop
 
 A sincronização bidirecional de comentários requer um mecanismo para evitar loops infinitos.
 
 ## Padrão Implementado
 
-| Direção | Prefixo/Marcador | Verificação |
-|---------|------------------|-------------|
-| Intercom → Azure | `[Intercom] texto` | Azure → Intercom verifica se contém `[Intercom]` |
-| Azure → Intercom | `<b>[Autor]</b> texto` | Intercom → Azure verifica se contém `<b>[` e `]</b>` |
+| Direção | Formato enviado | Onde verifica | O que verifica |
+|---------|-----------------|---------------|----------------|
+| Intercom → Azure | `[Intercom] <b>[CSer]</b><br>texto` | `Check Images` (Azure → Intercom) | `commentText.includes("[Intercom]")` |
+| Azure → Intercom | `<b>[Autor]</b><br>texto` | `Extract image URLs1` (Intercom → Azure) | `html.includes('<b>[') && html.includes(']</b>')` |
 
 ## Fluxo
 
 ```
-Intercom → Azure: "[Intercom] Mensagem do usuário"
+Intercom → Azure: "[Intercom] <b>[Deborah]</b><br>Mensagem do CSer"
                         ↓
 Azure → Intercom: Ignora (contém [Intercom])
 
-Azure → Intercom: "<b>[João]</b> Resposta do dev"
+Azure → Intercom: "<b>[João Dev]</b><br>Resposta do dev"
                         ↓
 Intercom → Azure: Ignora (contém <b>[ ]</b>)
 ```
@@ -581,7 +596,9 @@ Estados Intercom ↔ Azure:
   "4572479": "CS",
   "4572485": "Ready",
   "4572490": "On Hold",
-  "4572484": "Done"
+  "4572484": "Done",
+  "4645359": "Redoing",
+  "4645360": "CS Return"
 }
 ```
 
