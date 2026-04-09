@@ -35,6 +35,7 @@ Eventos tratados:
 - `ticket.note.created`
 - `ticket.attribute.updated`
 - `ticket.closed`
+- `ticket.admin.assigned`
 
 Padrão:
 
@@ -53,7 +54,7 @@ Responsável por:
 - Receber `ticket.created`
 - Buscar dados do contato
 - Buscar dados da empresa
-- Normalizar ambiente (iOS / Android / Web)
+- Normalizar ambiente (iOS / Android / Web / fallback Android)
 - Normalizar tags
 - Verificar tipo do ticket (Financeiro ou outros)
 - Criar Issue no Azure na area path correta
@@ -96,6 +97,15 @@ O Intercom pode enviar tickets sem título (`_default_title_: null`). Para evita
 _default_title_ || 'Ticket Intercom #' + ticket_id
 ```
 
+#### Normalização de Plataforma (Fallback)
+
+Quando nenhuma plataforma é identificada (ex: contatos vindos do WhatsApp sem dados de dispositivo), o `Normalize Environment` usa **Android como fallback**:
+
+- `platform: "android"`
+- `operationalSystem: "Android"`
+
+Isso evita que o Azure rejeite o valor `"unknown"` no campo `Custom.OperationalSystem`, que aceita apenas valores de uma lista fixa.
+
 #### Formatação da Descrição
 
 O Azure DevOps requer HTML para renderizar quebras de linha. O workflow converte automaticamente:
@@ -107,6 +117,28 @@ O Azure DevOps requer HTML para renderizar quebras de linha. O workflow converte
 
 **Antes**: `Linha 1\nLinha 2` (não renderiza quebra)
 **Depois**: `Linha 1<br>Linha 2` (renderiza corretamente)
+
+#### Tag de App Version
+
+Os cards criados no Azure incluem o **App Version** como tag automaticamente:
+
+```javascript
+// Tags no Azure: tag do tipo de ticket + versão do app
+[$json.azureTag, $json.appVersion].filter(Boolean).join("; ")
+// Exemplo: "Ongoing catálogo; 3.4.3"
+```
+
+Quando o `appVersion` é null (contato sem dados), a tag é omitida pelo `filter(Boolean)`.
+
+#### Retry em PATCH no Azure
+
+Os nodes que fazem PATCH no Azure têm **retry automático** configurado para evitar o erro `TF26071` (conflito de concorrência, quando outro processo altera o Work Item simultaneamente):
+
+- **Retry on Fail**: ativado
+- **Max tentativas**: 3
+- **Intervalo**: 2 segundos
+
+Nodes com retry: `HTTP Request (Azure - Set Done)`, `HTTP Request4` (Update State).
 
 ---
 
@@ -143,9 +175,9 @@ Responsável por:
 - Verificar anti-loop (ignorar comentários vindos do Azure)
 - Extrair Azure ID do ticket
 - Extrair nome do autor (`ticket_part.author.name`)
-- Verificar se há imagens no comentário
-- Fazer download e re-upload de imagens para o Azure (suporta múltiplas imagens)
-- Enviar comentário para o Azure DevOps com prefixo `[Intercom]` e nome do CSer
+- Verificar se há mídias (imagens, GIFs e vídeos) no comentário
+- Fazer download e re-upload de mídias para o Azure (suporta múltiplas mídias)
+- Enviar comentário para o Azure DevOps com nome do CSer
 
 #### Estrutura de Nodes
 
@@ -160,30 +192,39 @@ Tem imagens?
     └── Não → Prepare Simple Comment → Create Simple Comment
 ```
 
-#### Extração de Imagens
+#### Extração de Mídias (Imagens, GIFs e Vídeos)
 
-Prioridade de extração (corrigido para evitar pegar imagens erradas):
+Extração de duas fontes (ambas sempre processadas, não é fallback):
 
-1. **HTML do `ticket_part.body`** (comentário específico) - extrai `<img>` tags
-2. **Fallback**: `ticket_part.attachments` (anexos do comentário específico)
+1. **HTML do `ticket_part.body`** (comentário específico) - extrai `<img>`, `<video>` e `<source>` tags
+2. **`ticket_part.attachments`** (anexos do comentário específico) - aceita `image/*`, `video/*` e extensões de vídeo (`.mov`, `.mp4`, `.avi`, `.webm`, `.mkv`) mesmo com `content_type` genérico como `application/force-download`
+
+Um `Set` de URLs evita duplicatas entre as duas fontes.
 
 **Importante**: Não usa mais `ticket.ticket_attributes["Anexos"]` pois esse campo acumula todos os anexos do ticket inteiro.
 
-#### Suporte a Múltiplas Imagens
+#### Suporte a Múltiplas Mídias
 
-O `Fix image URL1` retorna N items (um por imagem), que são processados individualmente pelo pipeline de download/upload. O `Code in JavaScript2` agrega todas as imagens de volta em um único comentário.
+O `Fix image URL1` retorna N items (um por mídia), cada um com `mediaUrl` e `mediaType` (image/video). São processados individualmente pelo pipeline de download/upload. O `Code in JavaScript2` agrega todas as mídias de volta em um único comentário.
+
+O `Upload Attachment to Azure1` usa `fileName` dinâmico conforme o tipo:
+- Imagens: `fileName=image.png`
+- Vídeos: `fileName=video.mp4`
 
 #### Formato do Comentário no Azure
 
 ```
-[Intercom] <b>[Nome do CSer]</b>
+<b>[Nome do CSer]</b>
 Texto do comentário
-<img src="url_azure_1" /> <img src="url_azure_2" />
+<img src="url_azure_1" />
+<a href="url_azure_2" target="_blank">🎬 Ver vídeo</a>
 ```
 
-#### Re-upload de Imagens
+**Nota sobre vídeos**: O Azure DevOps sanitiza HTML e remove o atributo `controls` de tags `<video>`, impossibilitando playback inline. Por isso, vídeos são enviados como links clicáveis em vez de tags `<video>`.
 
-As URLs do Intercom (`downloads.intercomcdn.com`) são temporárias (têm `expires` e `signature`). O workflow faz download e re-upload para o Azure (`/_apis/wit/attachments`) para que as imagens fiquem permanentemente acessíveis.
+#### Re-upload de Mídias
+
+As URLs do Intercom (`downloads.intercomcdn.com`) são temporárias (têm `expires` e `signature`). O workflow faz download e re-upload para o Azure (`/_apis/wit/attachments`) para que as mídias fiquem permanentemente acessíveis.
 
 ---
 
@@ -198,6 +239,7 @@ Responsável por:
 - Comparar `previous` vs `current` para identificar apenas os **novos** anexos
 - Fazer download e re-upload dos novos anexos para o Azure
 - Vincular os anexos ao Work Item via JSON Patch (relations)
+- Criar comentário no Azure com as mídias embutidas (imagens como `<img>`, vídeos como link clicável)
 
 #### Estrutura de Nodes
 
@@ -208,8 +250,13 @@ Extract New Attachments  ← compara previous vs current, filtra novos
     ↓
 Download Attachment (attr) → Azure - Upload Attachment (attr)
     ↓
-Edit Fields (attr upload) → Build Patch (attr) → Azure - Link Attachment (attr)
+Edit Fields (attr upload) ──┬── Build Patch (attr) → Azure - Link Attachment (attr)
+                            └── Build Comment (attr) → Create Comment (attr)
 ```
+
+O fluxo faz duas coisas em paralelo após o upload:
+1. **Link como relação** — vincula o arquivo ao Work Item (`AttachedFile`)
+2. **Comentário com mídia** — cria comentário com `<img>` para imagens/GIFs e link clicável para vídeos
 
 #### Lógica de Detecção de Novos Anexos
 
@@ -253,6 +300,55 @@ Quando o Azure muda para "Done", o workflow **Azure → Intercom | Sync State** 
 
 ---
 
+### 6️⃣½ Intercom → Azure | Auto-Assign N2 (ticket.admin.assigned)
+
+**Parte do workflow**: `Router Intercom → Azure` (ID: `7KVwkk3VZ4W-omX0e9egP`)
+
+Responsável por:
+
+- Receber `ticket.admin.assigned` do Intercom
+- Verificar se o ticket foi assignado para **Kyter** (`admin_id: 6511614`)
+- Buscar os comentários do Work Item no Azure
+- Identificar o último comentário de um N2 (Eduarda ou Daniel)
+- Atualizar `System.AssignedTo` no Work Item com o email do N2 responsável
+
+#### Contexto de Negócio
+
+Quando o time de CS precisa de mais informação, o ticket volta para N2 (Eduarda ou Daniel) que deixa um comentário. Depois o CS resolve e devolve para N2 assignando para Kyter. O sistema automaticamente identifica quem foi o último N2 a comentar e assina o Work Item no Azure para essa pessoa.
+
+#### Estrutura de Nodes
+
+```
+Switch (output 5: ticket.admin.assigned)
+    ↓
+Check Assign to Kyter  ← só processa se assigned_to é Kyter (6511614)
+    ↓
+GET Azure Comments  ← GET /_apis/wit/workItems/{id}/comments (top 50, desc)
+    ↓
+Find Last N2 Author  ← busca último comentário de eduarda@ ou daniel@
+    ↓
+Assign to N2 (Azure)  ← PATCH System.AssignedTo
+```
+
+#### N2 Responsáveis
+
+```javascript
+{
+  'eduarda@kyte.com.br': 'eduarda@kyte.com.br',
+  'daniel@kyte.com.br': 'daniel@kyte.com.br'
+}
+```
+
+#### Comportamento Silencioso
+
+O fluxo **nunca gera erro**:
+- Assign para outro admin (não Kyter) → ignora (`return []`)
+- Sem Azure ID no ticket → ignora (`return []`)
+- Nenhum N2 encontrado nos comentários → ignora (`return []`)
+- PATCH falhar (ex: TF26071) → continua sem erro (`continueOnFail`)
+
+---
+
 ### 7️⃣ Azure → Intercom | Sync State
 
 **Workflow ID**: `4r_vSdJ3l55sEXiPSK5Q-`
@@ -264,6 +360,24 @@ Responsável por:
 - Mapear estado Azure → ticket_state_id Intercom
 - Atualizar ticket via PUT
 - **Ignorar estado "Done"** (evita loop com `ticket.closed`)
+- **Anti-loop genérico**: comparar estado atual do Intercom com o estado desejado antes de atualizar
+
+#### Source of Truth para Estado
+
+O `Code in JavaScript` usa **sempre o estado do webhook** (`$items("Edit Fields")[0].json.systemStateAzure`), não o estado retornado pelo GET no Azure (`Edit Fields1`). O GET pode retornar estado desatualizado por race condition.
+
+#### Anti-Loop de Estado
+
+Antes de atualizar o Intercom, o workflow compara o `ticket_custom_state_admin_label` do ticket (obtido via GET no Intercom) com o estado desejado. Se forem iguais, retorna `[]` e não tenta a transição, evitando o erro `"Cannot transition ticket to the same state"`.
+
+```javascript
+const currentLabel = ($json.ticket?.ticket_custom_state_admin_label || "").trim();
+if (currentLabel === state) {
+  return []; // Já está no estado desejado, ignora
+}
+```
+
+Isso resolve loops para **todos os estados** (não só Done), que ocorrem quando Intercom → Azure → Intercom propaga o mesmo estado de volta.
 
 #### Mapeamento atual (Azure → Intercom)
 
@@ -291,7 +405,7 @@ Responsável por:
 - Receber webhook de comentário do Azure DevOps (`workitem.commented`)
 - Extrair texto do comentário e autor
 - Verificar se tem Intercom ID vinculado
-- Processar imagens (converter para links clicáveis)
+- Processar mídias - imagens e vídeos (converter para links clicáveis)
 - Criar nota no ticket do Intercom
 
 #### Estrutura de Nodes
@@ -317,18 +431,25 @@ Tem Imagens? ─── Sim ──→ (rota não utilizada - ver limitações)
 - `$json.body.resource.fields['System.ChangedBy']` → commentAuthor
 - `$json.body.resource.fields['Custom.IntercomID']` → intercomId
 
-#### Tratamento de Imagens
+#### Tratamento de Mídias (Imagens e Vídeos)
 
 **Limitação da API Intercom**: A API de tickets do Intercom **não suporta upload de arquivos binários**. Tentativas com `attachment_files` e `formBinaryData` resultam em array vazio de attachments.
 
-**Solução implementada**: Imagens são convertidas em links clicáveis no texto do comentário.
+**Solução implementada**: Imagens e vídeos são convertidos em links clicáveis no texto do comentário.
 
 ```javascript
 // Check Images node - converte <img> em links
 processedText = processedText.replace(imgRegex, (match, url) => {
-    imageCount++;
+    mediaCount++;
     const cleanUrl = url.replace(/&amp;/g, "&");
-    return '<br><a href="' + cleanUrl + '" target="_blank">📷 Ver imagem ' + imageCount + '</a><br>';
+    return '<br><a href="' + cleanUrl + '" target="_blank">📷 Ver imagem ' + mediaCount + '</a><br>';
+});
+
+// Converte <video> em links
+processedText = processedText.replace(videoRegex, (match, videoSrc, sourceSrc) => {
+    mediaCount++;
+    const cleanUrl = (videoSrc || sourceSrc || "").replace(/&amp;/g, "&");
+    return '<br><a href="' + cleanUrl + '" target="_blank">🎬 Ver vídeo ' + mediaCount + '</a><br>';
 });
 ```
 
@@ -341,11 +462,11 @@ As notas são criadas usando o admin **Kyter**:
 
 #### Anti-Loop (implementado)
 
-O node `Check Images` verifica se o comentário contém o prefixo `[Intercom]` para evitar reprocessar comentários que vieram do Intercom:
+O node `Check Images` verifica se o comentário contém o marcador `<b>[` para evitar reprocessar comentários que vieram do Intercom:
 
 ```javascript
 // No Check Images node
-if (commentText.includes("[Intercom]")) {
+if (commentText.includes("<b>[")) {
     return []; // Ignora comentário que veio do Intercom
 }
 ```
@@ -354,25 +475,44 @@ if (commentText.includes("[Intercom]")) {
 
 # 🔄 Mecanismo Anti-Loop
 
-A sincronização bidirecional de comentários requer um mecanismo para evitar loops infinitos.
+A sincronização bidirecional requer mecanismos para evitar loops infinitos.
 
-## Padrão Implementado
+## Anti-Loop de Comentários
 
 | Direção | Formato enviado | Onde verifica | O que verifica |
 |---------|-----------------|---------------|----------------|
-| Intercom → Azure | `[Intercom] <b>[CSer]</b><br>texto` | `Check Images` (Azure → Intercom) | `commentText.includes("[Intercom]")` |
+| Intercom → Azure | `<b>[CSer]</b><br>texto` | `Check Images` (Azure → Intercom) | `commentText.includes("<b>[")` |
 | Azure → Intercom | `<b>[Autor]</b><br>texto` | `Extract image URLs1` (Intercom → Azure) | `html.includes('<b>[') && html.includes(']</b>')` |
 
-## Fluxo
+Ambas as direções usam o mesmo marcador `<b>[Nome]</b>` como identificador anti-loop.
+
+### Fluxo
 
 ```
-Intercom → Azure: "[Intercom] <b>[Deborah]</b><br>Mensagem do CSer"
+Intercom → Azure: "<b>[Deborah]</b><br>Mensagem do CSer"
                         ↓
-Azure → Intercom: Ignora (contém [Intercom])
+Azure → Intercom: Ignora (contém <b>[)
 
 Azure → Intercom: "<b>[João Dev]</b><br>Resposta do dev"
                         ↓
 Intercom → Azure: Ignora (contém <b>[ ]</b>)
+```
+
+## Anti-Loop de Estado
+
+| Direção | Onde verifica | O que verifica |
+|---------|---------------|----------------|
+| Intercom → Azure | `Code in JavaScript` (Router) | Mapeamento direto, sem anti-loop adicional necessário |
+| Azure → Intercom | `Code in JavaScript` (Sync State) | Compara `ticket_custom_state_admin_label` com estado desejado |
+| ticket.closed → Done | `Code in JavaScript` (Sync State) | Ignora estado "Done" (`return []`) |
+
+### Fluxo
+
+```
+Intercom muda para "CS Return" → Azure atualiza para "CS Return"
+                                        ↓
+Azure webhook dispara → Sync State verifica:
+  Intercom já está em "CS Return"? Sim → Ignora (return [])
 ```
 
 ---
@@ -524,6 +664,20 @@ Referências:
 ### attachment_urls
 
 O parâmetro `attachment_urls` aceita até 10 URLs, mas elas **devem ser publicamente acessíveis**. URLs do Azure DevOps requerem autenticação e não funcionam diretamente.
+
+## Azure DevOps - Comentários
+
+### Tag `<video>` sem controles
+
+O Azure DevOps sanitiza HTML nos comentários e **remove o atributo `controls`** de tags `<video>`. Sem `controls`, o vídeo aparece como frame estático sem botão de play.
+
+**Solução implementada**: Vídeos são enviados como links clicáveis (`🎬 Ver vídeo`) em vez de tags `<video>` embutidas.
+
+### Sincronização de Anexos Azure → Intercom
+
+Não implementado. URLs de anexos do Azure DevOps requerem autenticação (PAT) e não podem ser passadas para `attachment_urls` do Intercom. Possíveis soluções futuras:
+1. Links clicáveis no comentário (viável sem infraestrutura adicional)
+2. Storage intermediário público (S3, GCS) para re-upload
 
 ---
 

@@ -250,7 +250,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Kyte\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [\"n8n\", $json.azureTag].filter(Boolean).join(\"; \")}\n]) \n}}",
+        "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Kyte\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [$json.azureTag, $json.appVersion].filter(Boolean).join(\"; \")}\n]) \n}}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -515,6 +515,9 @@
             },
             {
               "value2": "ticket.closed"
+            },
+            {
+              "value2": "ticket.admin.assigned"
             }
           ]
         }
@@ -924,7 +927,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const azureId = $json.azureId;\nconst text = $json.commentText || \"\";\nconst html = $json.commentHtml || \"\";\nconst authorName = $json.authorName || \"Intercom\";\n\n// Anti-loop: ignora comentários que vieram do Azure\nif (html.includes('<b>[') && html.includes(']</b>')) {\n  return [];\n}\n\n// Validação: Azure ID é obrigatório para sincronizar comentários\nif (!azureId || azureId === 0) {\n  throw new Error(\"Azure ID não encontrado no ticket. O ticket precisa ter um Azure ID vinculado para sincronizar comentários.\");\n}\n\n// 1) Prioriza imagens do HTML do ticket_part (comentário específico)\nlet imageUrls = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/g)]\n  .map(m => m[1].replace(/&amp;/g, \"&\"));\n\n// 2) Fallback: anexos do ticket_part\nif (!imageUrls.length) {\n  const attachments = $json.attachments || [];\n  imageUrls = attachments\n    .filter(a => (a.content_type || \"\").startsWith(\"image/\"))\n    .map(a => (a.url || \"\").replace(/&amp;/g, \"&\"));\n}\n\nreturn [{ json: { azureId, text, imageUrls, authorName } }];"
+        "jsCode": "const azureId = $json.azureId;\nconst text = $json.commentText || \"\";\nconst html = $json.commentHtml || \"\";\nconst authorName = $json.authorName || \"Intercom\";\n\n// Anti-loop: ignora comentários que vieram do Azure\nif (html.includes('<b>[') && html.includes(']</b>')) {\n  return [];\n}\n\n// Validação: Azure ID é obrigatório para sincronizar comentários\nif (!azureId || azureId === 0) {\n  throw new Error(\"Azure ID não encontrado no ticket. O ticket precisa ter um Azure ID vinculado para sincronizar comentários.\");\n}\n\nconst mediaItems = [];\nconst seenUrls = new Set();\n\n// 1) Extrai imagens do HTML do ticket_part\nconst imgMatches = [...html.matchAll(/<img[^>]+src=\"([^\"]+)\"/g)];\nfor (const m of imgMatches) {\n  const url = m[1].replace(/&amp;/g, \"&\");\n  if (!seenUrls.has(url)) {\n    seenUrls.add(url);\n    mediaItems.push({ url, type: \"image\" });\n  }\n}\n\n// 2) Extrai vídeos do HTML do ticket_part\nconst videoMatches = [...html.matchAll(/<video[^>]+src=\"([^\"]+)\"/g)];\nfor (const m of videoMatches) {\n  const url = m[1].replace(/&amp;/g, \"&\");\n  if (!seenUrls.has(url)) {\n    seenUrls.add(url);\n    mediaItems.push({ url, type: \"video\" });\n  }\n}\nconst sourceMatches = [...html.matchAll(/<source[^>]+src=\"([^\"]+)\"/g)];\nfor (const m of sourceMatches) {\n  const url = m[1].replace(/&amp;/g, \"&\");\n  if (!seenUrls.has(url)) {\n    seenUrls.add(url);\n    mediaItems.push({ url, type: \"video\" });\n  }\n}\n\n// 3) Sempre processa attachments do ticket_part (não é mais fallback)\nconst attachments = $json.attachments || [];\nconst videoExtensions = [\".mov\", \".mp4\", \".avi\", \".webm\", \".mkv\"];\n\nfor (const a of attachments) {\n  const ct = (a.content_type || \"\").toLowerCase();\n  const name = (a.name || \"\").toLowerCase();\n  const url = (a.url || \"\").replace(/&amp;/g, \"&\");\n  \n  if (seenUrls.has(url)) continue;\n  seenUrls.add(url);\n  \n  if (ct.startsWith(\"video/\") || videoExtensions.some(ext => name.endsWith(ext))) {\n    mediaItems.push({ url, type: \"video\" });\n  } else {\n    // Imagens, GIFs, e qualquer outro tipo de mídia\n    mediaItems.push({ url, type: \"image\" });\n  }\n}\n\nreturn [{ json: { azureId, text, mediaItems, authorName } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -947,7 +950,7 @@
           "conditions": [
             {
               "id": "img-check-001",
-              "leftValue": "={{ $json.imageUrls.length > 0 }}",
+              "leftValue": "={{ $json.mediaItems.length > 0 }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -971,7 +974,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Comentário simples sem imagens\nconst azureId = $json.azureId;\nconst text = $json.text || \"(sem texto)\";\nconst authorName = $json.authorName || 'Intercom';\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '[Intercom] <b>[' + authorName + ']</b><br>' + text\n  }\n}];"
+        "jsCode": "// Comentário simples sem imagens\nconst azureId = $json.azureId;\nconst text = $json.text || \"(sem texto)\";\nconst authorName = $json.authorName || 'Intercom';\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '<b>[' + authorName + ']</b><br>' + text\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1025,7 +1028,7 @@
     },
     {
       "parameters": {
-        "url": "={{$json.imageUrl}}",
+        "url": "={{$json.mediaUrl}}",
         "options": {
           "response": {
             "response": {
@@ -1046,7 +1049,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://dev.azure.com/KyteLand/Ongoing/_apis/wit/attachments?fileName=image.png&api-version=7.1-preview.3",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/attachments?fileName={{ $json.mediaType === 'video' ? 'video.mp4' : 'image.png' }}&api-version=7.1-preview.3",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendHeaders": true,
@@ -1081,7 +1084,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const azureId = items[0].json.azureId;\nconst text = items[0].json.text || \"Atualização com imagem\";\nconst authorName = items[0].json.authorName || 'Intercom';\n\n// Agrega todas as imagens uploadadas ao Azure\nconst imageHtml = items.map(item => {\n  const attachmentUrl = item.json.url;\n  return '<br><br><img src=\"' + attachmentUrl + '\" alt=\"imagem\" />';\n}).join('');\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '[Intercom] <b>[' + authorName + ']</b><br>' + text + imageHtml\n  }\n}];"
+        "jsCode": "const azureId = items[0].json.azureId;\nconst text = items[0].json.text || \"Atualização com mídia\";\nconst authorName = items[0].json.authorName || 'Intercom';\n\n// Agrega todas as mídias uploadadas ao Azure\nconst mediaHtml = items.map(item => {\n  const attachmentUrl = item.json.url;\n  const mediaType = item.json.mediaType || 'image';\n  \n  if (mediaType === 'video') {\n    return '<br><br><a href=\"' + attachmentUrl + '\" target=\"_blank\">🎬 Ver vídeo</a>';\n  }\n  return '<br><br><img src=\"' + attachmentUrl + '\" alt=\"imagem\" />';\n}).join('');\n\n// Prefixo anti-loop + nome do CSer\nreturn [{\n  json: {\n    azureId,\n    comment: '<b>[' + authorName + ']</b><br>' + text + mediaHtml\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1094,7 +1097,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const urls = $json.imageUrls || [];\nconst azureId = $json.azureId;\nconst text = $json.text;\nconst authorName = $json.authorName || 'Intercom';\n\nreturn urls.map(url => ({\n  json: {\n    azureId,\n    text,\n    authorName,\n    imageUrl: url.replace(/&amp;/g, '&').trim()\n  }\n}));"
+        "jsCode": "const mediaItems = $json.mediaItems || [];\nconst azureId = $json.azureId;\nconst text = $json.text;\nconst authorName = $json.authorName || 'Intercom';\n\nreturn mediaItems.map(item => ({\n  json: {\n    azureId,\n    text,\n    authorName,\n    mediaUrl: item.url.replace(/&amp;/g, '&').trim(),\n    mediaType: item.type\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1137,6 +1140,12 @@
               "id": "author-field-001",
               "name": "authorName",
               "value": "={{ $('Extract image URLs1').item.json.authorName }}",
+              "type": "string"
+            },
+            {
+              "id": "media-type-field-001",
+              "name": "mediaType",
+              "value": "={{ $('Fix image URL1').item.json.mediaType }}",
               "type": "string"
             }
           ]
@@ -1241,6 +1250,18 @@
               "name": "azureId",
               "value": "={{ $('Extract New Attachments').item.json.azureId }}",
               "type": "number"
+            },
+            {
+              "id": "attr-fileName",
+              "name": "fileName",
+              "value": "={{ $('Extract New Attachments').item.json.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "attr-contentType",
+              "name": "contentType",
+              "value": "={{ $('Extract New Attachments').item.json.contentType }}",
+              "type": "string"
             }
           ]
         },
@@ -1349,7 +1370,10 @@
           "id": "IvNiMkEcky5nmtij",
           "name": "PAT do Azure"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "parameters": {
@@ -1433,7 +1457,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Financeiro\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [\"n8n\", $json.azureTag].filter(Boolean).join(\"; \")},\n  { op: \"add\", path: \"/fields/System.AssignedTo\", value: \"karissa@kyte.com.br\" }\n]) \n}}",
+        "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Financeiro\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [$json.azureTag].filter(Boolean).join(\"; \")},\n  { op: \"add\", path: \"/fields/System.AssignedTo\", value: \"karissa@kyte.com.br\" }\n]) \n}}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -1450,6 +1474,149 @@
           "name": "PAT do Azure"
         }
       }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const azureId = items[0].json.azureId;\n\nconst videoExtensions = ['.mov', '.mp4', '.avi', '.webm', '.mkv', '.gif'];\n\nconst mediaHtml = items.map(item => {\n  const url = item.json.url;\n  const fileName = (item.json.fileName || '').toLowerCase();\n  const contentType = (item.json.contentType || '').toLowerCase();\n  \n  const isVideo = contentType.startsWith('video/') || videoExtensions.some(ext => fileName.endsWith(ext));\n  \n  if (isVideo) {\n    return '<br><a href=\"' + url + '\" target=\"_blank\">🎬 Ver vídeo</a>';\n  }\n  return '<br><img src=\"' + url + '\" alt=\"' + (item.json.fileName || 'anexo') + '\" />';\n}).join('');\n\nreturn [{\n  json: {\n    azureId,\n    comment: '<b>[Anexo via atributo]</b>' + mediaHtml\n  }\n}];"
+      },
+      "id": "build-comment-attr-001",
+      "name": "Build Comment (attr)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        2552
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workItems/{{$json.azureId}}/comments?api-version=7.1-preview.3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$json.comment}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-comment-attr-001",
+      "name": "Create Comment (attr)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        2552
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $json.body.data.item.ticket;\nconst ticketPart = $json.body.data.item.ticket_part;\nconst assignedTo = ticketPart?.assigned_to?.id;\n\n// Só processa se foi assignado para Kyter\nif (assignedTo !== '6511614') {\n  return [];\n}\n\nconst azureId = ticket?.ticket_attributes?.['Azure ID'];\nif (!azureId) {\n  return [];\n}\n\nreturn [{\n  json: {\n    azureId: Number(String(azureId).trim()),\n    ticketId: ticket.ticket_id\n  }\n}];"
+      },
+      "id": "check-assign-kyter-001",
+      "name": "Check Assign to Kyter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2000,
+        3324
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workItems/{{$json.azureId}}/comments?api-version=7.1-preview.3&$top=50&order=desc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "id": "get-azure-comments-001",
+      "name": "GET Azure Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1700,
+        3324
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const comments = $json.comments || [];\nconst azureId = $('Check Assign to Kyter').item.json.azureId;\n\n// Emails dos N2 responsáveis\nconst n2Map = {\n  'eduarda@kyte.com.br': 'eduarda@kyte.com.br',\n  'daniel@kyte.com.br': 'daniel@kyte.com.br'\n};\n\n// Busca o último comentário de um N2\nfor (const comment of comments) {\n  const authorEmail = (comment.createdBy?.uniqueName || '').toLowerCase();\n  if (n2Map[authorEmail]) {\n    return [{\n      json: {\n        azureId,\n        assignTo: n2Map[authorEmail],\n        lastCommentBy: comment.createdBy?.displayName || authorEmail\n      }\n    }];\n  }\n}\n\n// Nenhum N2 encontrado nos comentários — não faz assign\nreturn [];"
+      },
+      "id": "find-last-n2-001",
+      "name": "Find Last N2 Author",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        3324
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dev.azure.com/KyteLand/Ongoing/_apis/wit/workitems/{{$json.azureId}}?api-version=7.1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json-patch+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"op\": \"add\",\n    \"path\": \"/fields/System.AssignedTo\",\n    \"value\": \"{{$json.assignTo}}\"\n  }\n]",
+        "options": {}
+      },
+      "id": "assign-n2-azure-001",
+      "name": "Assign to N2 (Azure)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1100,
+        3324
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "IvNiMkEcky5nmtij",
+          "name": "PAT do Azure"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1631,6 +1798,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Check Assign to Kyter",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1683,6 +1857,11 @@
         [
           {
             "node": "Build Patch (attr)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Comment (attr)",
             "type": "main",
             "index": 0
           }
@@ -1934,6 +2113,50 @@
         [
           {
             "node": "Azure id + link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Comment (attr)": {
+      "main": [
+        [
+          {
+            "node": "Create Comment (attr)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Assign to Kyter": {
+      "main": [
+        [
+          {
+            "node": "GET Azure Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Azure Comments": {
+      "main": [
+        [
+          {
+            "node": "Find Last N2 Author",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Last N2 Author": {
+      "main": [
+        [
+          {
+            "node": "Assign to N2 (Azure)",
             "type": "main",
             "index": 0
           }
@@ -2716,7 +2939,7 @@
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Kyte\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [\"n8n\", $json.azureTag].filter(Boolean).join(\"; \")}\n]) \n}}",
+          "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Kyte\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [$json.azureTag, $json.appVersion].filter(Boolean).join(\"; \")}\n]) \n}}",
           "options": {}
         },
         "type": "n8n-nodes-base.httpRequest",
@@ -3899,7 +4122,7 @@
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Financeiro\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [\"n8n\", $json.azureTag].filter(Boolean).join(\"; \")},\n  { op: \"add\", path: \"/fields/System.AssignedTo\", value: \"karissa@kyte.com.br\" }\n]) \n}}",
+          "jsonBody": "={{ \nJSON.stringify([\n  {op: \"add\", path:\"/fields/System.AreaPath\", value: \"Ongoing\\\\Financeiro\"},\n  { op: \"add\", path: \"/fields/System.Title\", value: $json.title },\n  { op: \"add\", path: \"/fields/System.Description\", value: ($json.description || \"\").replace(/\\n/g, \"<br>\") },\n  { op: \"add\", path: \"/fields/Custom.Aid\", value: $json.aid || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.Email\", value: $json.email || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.LinkCatalog\", value: $json.catalogUrl || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomID\", value: $json.intercomId || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.AppVersion\", value: $json.appVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.OperationalSystem\", value: $json.platform },\n  { op: \"add\", path: \"/fields/Custom.OSversion\", value: $json.osVersion || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.ConversationLink\", value: $json.conversationLink },\n  { op: \"add\", path: \"/fields/Custom.IntercomCreatedBy\", value: $json.createdBy || \"-\" },\n  { op: \"add\", path: \"/fields/Custom.IntercomTicketID\", value: $json.ticketId || \"-\" },\n  { op: \"add\", path: \"/fields/System.Tags\", value: [$json.azureTag].filter(Boolean).join(\"; \")},\n  { op: \"add\", path: \"/fields/System.AssignedTo\", value: \"karissa@kyte.com.br\" }\n]) \n}}",
           "options": {}
         },
         "type": "n8n-nodes-base.httpRequest",
